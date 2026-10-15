@@ -117,8 +117,8 @@ pub(crate) fn from_thir<'tcx>(
         .fold(body, |body: Term<'tcx>, (ident, pattern)| {
             use PatternKind::*;
             match pattern.kind {
-                Binder(v, box Pattern { kind: Wildcard, .. }) if v.0 == ident => body,
-                Wildcard | Tuple(box []) => body,
+                Binder(v, Pattern { kind: Wildcard, .. }) if v.0 == ident => body,
+                Wildcard | Tuple([]) => body,
                 _ => {
                     let span = body.span;
                     let ty = pattern.ty;
@@ -187,7 +187,7 @@ impl<'tcx> ThirTerm<'_, 'tcx> {
                 }
             }
             ExprKind::Block { block } => {
-                if let Block { stmts: box [], expr: Some(expr), .. } = self.thir[block] {
+                if let Block { stmts: [], expr: Some(expr), .. } = self.thir[block] {
                     self.collect_triggers(expr, triggers)
                 } else {
                     Ok(expr)
@@ -225,7 +225,7 @@ impl<'tcx> ThirTerm<'_, 'tcx> {
     /// `true` for `ensures`/`requires`
     fn is_spec_expr(&self, id: ExprId) -> bool {
         match head(self.thir, id).kind {
-            ExprKind::Closure(box ClosureExpr { closure_id, .. }) => {
+            ExprKind::Closure(ClosureExpr { closure_id, .. }) => {
                 let closure_id = closure_id.to_def_id();
                 is_spec(self.ctx.tcx, closure_id) && !is_assertion(self.ctx.tcx, closure_id)
             }
@@ -336,7 +336,7 @@ impl<'tcx> ThirTerm<'_, 'tcx> {
                         };
                         let e = head(self.thir, args[0]);
                             match e.kind {
-                                    ExprKind::Closure(box ClosureExpr { closure_id, .. }) => {
+                                    ExprKind::Closure(ClosureExpr { closure_id, .. }) => {
                                         let inputs = self.ctx.inputs_and_output(closure_id.into()).0;
                                         let TermWithTriggers { term, triggers } = from_thir(self.ctx, closure_id, self.renaming, TermSort::LogicClosure(inputs))?;
                                         let binders = inputs.iter().skip(1).map(|&(x, _, ty)| (x, ty)).collect();
@@ -472,7 +472,7 @@ impl<'tcx> ThirTerm<'_, 'tcx> {
             ExprKind::Borrow { arg, .. } => {
                 Ok(Term { ty, span, kind: self.logical_reborrow(arg)? })
             }
-            ExprKind::Adt(box AdtExpr {
+            ExprKind::Adt(AdtExpr {
                 adt_def,
                 variant_index,
                 ref fields,
@@ -576,7 +576,7 @@ impl<'tcx> ThirTerm<'_, 'tcx> {
             }
             ExprKind::NamedConst { def_id, args, .. } => Ok(Term::const_item(def_id, args, ty)),
             ExprKind::ZstLiteral { .. } => Ok(Term { ty, span, kind: TermKind::Lit(Literal::ZST) }),
-            ExprKind::Closure(box ClosureExpr { closure_id, .. }) => {
+            ExprKind::Closure(ClosureExpr { closure_id, .. }) => {
                 if is_logic_closure(self.ctx.tcx, closure_id.into()) {
                     let inputs = self.ctx.inputs_and_output(closure_id.into()).0;
                     assert!(inputs.len() == 2); // self (ignored) and the actual argument
